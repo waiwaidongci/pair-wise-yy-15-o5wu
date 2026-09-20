@@ -1,126 +1,78 @@
+import { useState } from "react";
 import "./styles.css";
+import { store } from "./storage/store";
+import { useAppData } from "./storage/react";
+import Console from "./ui/Console";
+import Overview from "./ui/Overview";
+import PigeonProfiles from "./ui/PigeonProfiles";
 
-const project = {
-  "sourceNo": 9,
-  "id": "hxyfront-62014",
-  "port": 62014,
-  "title": "赛鸽训放记录",
-  "domain": "赛鸽训放",
-  "prompt": "我想做一个面向赛鸽棚的训放记录前端工具，鸽主可以记录足环号、血统、训放地点、放飞距离、天气、归巢时间、飞行速度、健康状态和配对记录。页面需要有鸽棚总览、训放成绩排行、未归巢提醒、单羽赛鸽档案和按血统筛选的历史成绩。",
-  "palette": [
-    "#1d4ed8",
-    "#64748b",
-    "#f97316"
-  ],
-  "metrics": [
-    "归巢率",
-    "平均速度",
-    "未归巢",
-    "血统档案"
-  ],
-  "filters": [
-    "短距离",
-    "中距离",
-    "长距离",
-    "种鸽"
-  ],
-  "fields": [
-    "足环号",
-    "血统",
-    "训放地点",
-    "放飞距离",
-    "归巢时间",
-    "健康状态"
-  ],
-  "records": [
-    [
-      "CHN-24-001839",
-      "詹森系",
-      "80km，晴",
-      "均速1180m/min"
-    ],
-    [
-      "CHN-24-002114",
-      "凡龙系",
-      "120km，侧风",
-      "归巢延迟"
-    ],
-    [
-      "CHN-23-008771",
-      "种鸽",
-      "配对记录更新",
-      "健康正常"
-    ]
-  ]
-};
+type Tab = "console" | "overview" | "profiles";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "console", label: "批次核验台" },
+  { key: "overview", label: "鸽棚总览" },
+  { key: "profiles", label: "单羽档案" },
+];
+
+const OPERATOR_KEY = "pigeon-batch-console:operator";
 
 function App() {
+  const data = useAppData();
+  const [tab, setTab] = useState<Tab>("console");
+  const [operatorId, setOperatorId] = useState<string>(
+    () => localStorage.getItem(OPERATOR_KEY) ?? "owner-li",
+  );
+  const [operatorDraft, setOperatorDraft] = useState(operatorId);
+
+  function commitOperator() {
+    const v = operatorDraft.trim() || "anonymous";
+    setOperatorId(v);
+    localStorage.setItem(OPERATOR_KEY, v);
+  }
+
+  async function resetDemo() {
+    if (window.confirm("重置为演示数据？当前本地改动将被清空。")) {
+      await store.resetDemo();
+    }
+  }
+
   return (
-    <main className="app">
-      <section className="hero">
-        <p>{project.id} · 源提示词{project.sourceNo} · Port {project.port}</p>
-        <h1>{project.title}</h1>
-        <span>{project.prompt}</span>
-      </section>
+    <main className="app app-v2">
+      <header className="topbar">
+        <div className="brand">
+          <h1>赛鸽训放 · 批次核验台</h1>
+          <p>规则 / 存储 / 页面三层分离 · 冲突 409 不落库 · 参数修订旧结论留档</p>
+        </div>
+        <div className="operator">
+          <label>
+            <span>当前操作人（提交/建批/修订参数）</span>
+            <input
+              value={operatorDraft}
+              onChange={(e) => setOperatorDraft(e.target.value)}
+              onBlur={commitOperator}
+              placeholder="owner-li"
+            />
+          </label>
+          <button onClick={resetDemo}>重置演示数据</button>
+        </div>
+      </header>
 
-      <section className="metrics">
-        {project.metrics.map((metric: string, index: number) => (
-          <article key={metric}>
-            <small>{metric}</small>
-            <strong>{[28, 6, 14, 91][index] ?? 10}</strong>
-          </article>
+      <nav className="tabs">
+        {TABS.map((t) => (
+          <button key={t.key} className={tab === t.key ? "tab active" : "tab"} onClick={() => setTab(t.key)}>
+            {t.label}
+          </button>
         ))}
-      </section>
+      </nav>
 
-      <section className="workspace">
-        <aside className="panel">
-          <h2>{project.domain}分类</h2>
-          <div className="chips">
-            {project.filters.map((item: string) => (
-              <button key={item}>{item}</button>
-            ))}
-          </div>
-        </aside>
+      {tab === "console" && <Console data={data} operatorId={operatorId} />}
+      {tab === "overview" && <Overview data={data} operatorId={operatorId} />}
+      {tab === "profiles" && <PigeonProfiles data={data} operatorId={operatorId} />}
 
-        <section className="panel form-panel">
-          <div className="heading">
-            <div>
-              <p>专业字段</p>
-              <h2>新增记录</h2>
-            </div>
-            <button className="primary">保存记录</button>
-          </div>
-          <div className="field-grid">
-            {project.fields.map((field: string) => (
-              <label key={field}>
-                <span>{field}</span>
-                <input placeholder={"填写" + field} />
-              </label>
-            ))}
-          </div>
-        </section>
-      </section>
-
-      <section className="panel">
-        <div className="heading">
-          <div>
-            <p>近期记录</p>
-            <h2>工作台摘要</h2>
-          </div>
-          <button>导出CSV</button>
-        </div>
-        <div className="records">
-          {project.records.map((record: string[], index: number) => (
-            <article key={record.join("-")}>
-              <b>{String(index + 1).padStart(2, "0")}</b>
-              <div>
-                <h3>{record[0]}</h3>
-                <p>{record.slice(1).join(" · ")}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <footer className="footer-note">
+        核验规则：每羽在同一未结束批次仅可出现一次；早于放飞、缺航距、分速越界（400–1800 m/min）只留待复核；
+        鸽主与传感器报时差异超过 60 秒保留双方原值，由提交人之外的另一人复核。所有排行、提醒、档案均由同一套规则函数即时推导。
+      </footer>
     </main>
   );
 }
